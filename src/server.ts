@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import compress from '@fastify/compress'
 import multipart from '@fastify/multipart'
 import httpProxy from '@fastify/http-proxy'
 import { Client } from 'minio'
@@ -19,8 +20,19 @@ const fastify = Fastify({
 const start = async () => {
   try {
     await fastify.register(cors, {
-      origin: true,
-      credentials: true
+      origin: [
+        'https://koknese-ar.vercel.app',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+      ],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    })
+
+    // Add compression (gzip/brotli) - this will reduce 120MB significantly
+    await fastify.register(compress, {
+      global: true,
+      threshold: 1024, // Only compress files larger than 1KB
     })
 
     await fastify.register(multipart)

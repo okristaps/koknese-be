@@ -48,7 +48,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
           const filename = obj.name.replace(prefix, '')
           objects.push({
             filename,
-            url: `http://165.22.155.154:3001/api/images/${placeId}/${filename}`
+            url: `https://refused-buses-motorcycles-producer.trycloudflare.com/api/images/${placeId}/${filename}`
           })
         }
       }
