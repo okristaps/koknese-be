@@ -48,7 +48,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
           const filename = obj.name.replace(prefix, "");
           objects.push({
             filename,
-            url: `https://cuba-stakeholders-lighting-incentive.trycloudflare.com/api/images/${placeId}/${filename}`,
+            url: `/api/images/${placeId}/${filename}`,
           });
         }
       }
