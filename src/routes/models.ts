@@ -6,8 +6,22 @@ interface ModelParams {
 }
 
 export const modelsRoutes = async (fastify: FastifyInstance) => {
+  // Get MinIO bucket URL - construct from environment or use default
+  const getMinioUrl = () => {
+    const endpoint = process.env.MINIO_ENDPOINT || 'localhost'
+    const port = process.env.MINIO_PORT || '9000'
+    const useSSL = process.env.MINIO_USE_SSL === 'true'
+    const protocol = useSSL ? 'https' : 'http'
+    
+    // If it's localhost, include port, otherwise assume it's a domain
+    if (endpoint === 'localhost' || endpoint === '127.0.0.1') {
+      return `${protocol}://${endpoint}:${port}`
+    }
+    return `${protocol}://${endpoint}`
+  }
+
   // Get all available 3D models
-  fastify.get('/', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.get('/', async (request, reply: FastifyReply) => {
     try {
       const objectsStream = fastify.minio.listObjects(BUCKETS.MODELS, '', true)
       const models: Array<{
@@ -17,13 +31,15 @@ export const modelsRoutes = async (fastify: FastifyInstance) => {
         url: string;
       }> = []
       
+      const minioUrl = getMinioUrl()
+      
       for await (const obj of objectsStream) {
         if (obj.name && obj.name.endsWith('.glb')) {
           models.push({
             name: obj.name,
             size: obj.size,
             lastModified: obj.lastModified,
-            url: `/api/models/download/${encodeURIComponent(obj.name)}`
+            url: `${minioUrl}/${BUCKETS.MODELS}/${obj.name}`
           })
         }
       }
