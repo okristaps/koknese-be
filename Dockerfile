@@ -3,10 +3,10 @@ FROM node:20-alpine
 
 # Install curl for health checks and MinIO (auto-detect architecture)
 RUN apk add --no-cache curl && \
-    ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; elif [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
-    wget https://dl.min.io/server/minio/release/linux-${ARCH}/minio -O /usr/local/bin/minio && \
-    chmod +x /usr/local/bin/minio
+  ARCH=$(uname -m) && \
+  if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; elif [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
+  wget https://dl.min.io/server/minio/release/linux-${ARCH}/minio -O /usr/local/bin/minio && \
+  chmod +x /usr/local/bin/minio
 
 # Create MinIO data directory
 RUN mkdir -p /data
@@ -29,14 +29,14 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build TypeScript
-RUN pnpm build
+RUN sh
 
 # Create startup script
 RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'minio server /data --address ":9000" --console-address ":9001" &' >> /start.sh && \
-    echo 'sleep 5' >> /start.sh && \
-    echo 'cd /usr/src/app && pnpm start' >> /start.sh && \
-    chmod +x /start.sh
+  echo 'minio server /data --address ":9000" --console-address ":9001" &' >> /start.sh && \
+  echo 'sleep 5' >> /start.sh && \
+  echo 'cd /usr/src/app && pnpm start' >> /start.sh && \
+  chmod +x /start.sh
 
 # Set environment variables for MinIO connection
 ENV MINIO_ENDPOINT=localhost
