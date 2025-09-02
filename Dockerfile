@@ -1,6 +1,13 @@
 # Use Node.js 20 Alpine as base image
 FROM node:20-alpine
 
+# Install MinIO
+RUN wget https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio && \
+    chmod +x /usr/local/bin/minio
+
+# Create MinIO data directory
+RUN mkdir -p /data
+
 # Enable pnpm
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -21,20 +28,26 @@ COPY . .
 # Build TypeScript
 RUN pnpm build
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodeuser -u 1001
+# Create startup script
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'minio server /data --address ":9000" --console-address ":9001" &' >> /start.sh && \
+    echo 'sleep 5' >> /start.sh && \
+    echo 'cd /usr/src/app && pnpm start' >> /start.sh && \
+    chmod +x /start.sh
 
-# Change ownership of the app directory
-RUN chown -R nodeuser:nodejs /usr/src/app
-USER nodeuser
+# Set environment variables for MinIO connection
+ENV MINIO_ENDPOINT=localhost
+ENV MINIO_PORT=9000
+ENV MINIO_USE_SSL=false
+ENV MINIO_ACCESS_KEY=minioadmin
+ENV MINIO_SECRET_KEY=minioadmin123
 
-# Expose port
-EXPOSE 3001
+# Expose ports
+EXPOSE 3001 9000 9001
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-# Start the application
-CMD ["pnpm", "start"]
+# Start both MinIO and the application
+CMD ["/start.sh"]
