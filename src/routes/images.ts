@@ -48,7 +48,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
           const filename = obj.name.replace(prefix, '')
           objects.push({
             filename,
-            url: `http://localhost:3001/api/images/${placeId}/${filename}`
+            url: `http://165.22.155.154:3001/api/images/${placeId}/${filename}`
           })
         }
       }
