@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import multipart from '@fastify/multipart'
+import httpProxy from '@fastify/http-proxy'
 import { Client } from 'minio'
 import { minioClient, initializeBuckets } from './config/minio.js'
 import { setupRoutes } from './routes/index.js'
@@ -23,6 +24,14 @@ const start = async () => {
     })
 
     await fastify.register(multipart)
+
+    // Proxy MinIO console
+    await fastify.register(httpProxy, {
+      upstream: 'http://localhost:9001',
+      prefix: '/console',
+      rewritePrefix: '/',
+      websocket: true
+    })
 
     fastify.decorate('minio', minioClient)
 
