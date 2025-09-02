@@ -11,6 +11,7 @@ const minioClient = new Client({
 const BUCKETS = {
   MODELS: "models",
   AUDIO_GUIDES: "audio-guides",
+  VISUALIZATIONS: "visualizations",
 };
 
 const initializeBuckets = async () => {
