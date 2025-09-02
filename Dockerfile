@@ -1,8 +1,11 @@
 # Use Node.js 20 Alpine as base image
 FROM node:20-alpine
 
-# Install MinIO
-RUN wget https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio && \
+# Install curl for health checks and MinIO (auto-detect architecture)
+RUN apk add --no-cache curl && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; elif [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
+    wget https://dl.min.io/server/minio/release/linux-${ARCH}/minio -O /usr/local/bin/minio && \
     chmod +x /usr/local/bin/minio
 
 # Create MinIO data directory
