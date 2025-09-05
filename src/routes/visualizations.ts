@@ -24,17 +24,20 @@ export const visualizationsRoutes = async (fastify: FastifyInstance) => {
   fastify.get("/:placeId", async (request: FastifyRequest<{ Params: VisualizationParams }>, reply: FastifyReply) => {
     try {
       const { placeId } = request.params;
-      const filename = `${placeId}.html`;
+      const folderPath = `${placeId}_3d`;
+      const filename = 'index.htm';
+      const fullPath = `${folderPath}/${filename}`;
       const minioUrl = getMinioUrl();
 
       // Check if the file exists first
-      await fastify.minio.statObject(BUCKETS.VISUALIZATIONS, filename);
+      await fastify.minio.statObject(BUCKETS.VISUALIZATIONS, fullPath);
 
       // Return direct bucket URL
       return reply.send({
         placeId,
+        folder: folderPath,
         filename,
-        url: `${minioUrl}/${BUCKETS.VISUALIZATIONS}/${filename}`
+        url: `${minioUrl}/${BUCKETS.VISUALIZATIONS}/${fullPath}`
       });
     } catch (error: unknown) {
       if ((error as any).code === "NoSuchKey") {
@@ -51,6 +54,7 @@ export const visualizationsRoutes = async (fastify: FastifyInstance) => {
       const objectsStream = fastify.minio.listObjects(BUCKETS.VISUALIZATIONS, "", true);
       const visualizations: Array<{
         placeId: string;
+        folder: string;
         filename: string;
         size: number;
         lastModified: Date;
@@ -58,17 +62,25 @@ export const visualizationsRoutes = async (fastify: FastifyInstance) => {
       }> = [];
 
       const minioUrl = getMinioUrl();
+      const processedFolders = new Set<string>();
 
       for await (const obj of objectsStream) {
-        if (obj.name && obj.name.endsWith(".html")) {
-          const placeId = obj.name.replace(".html", "");
-          visualizations.push({
-            placeId,
-            filename: obj.name,
-            size: obj.size,
-            lastModified: obj.lastModified,
-            url: `${minioUrl}/${BUCKETS.VISUALIZATIONS}/${obj.name}`,
-          });
+        if (obj.name && obj.name.endsWith("index.htm") && obj.name.includes("_3d/")) {
+          const folderPath = obj.name.split("/")[0];
+          
+          if (!processedFolders.has(folderPath)) {
+            processedFolders.add(folderPath);
+            const placeId = folderPath.replace("_3d", "");
+            
+            visualizations.push({
+              placeId,
+              folder: folderPath,
+              filename: "index.htm",
+              size: obj.size,
+              lastModified: obj.lastModified,
+              url: `${minioUrl}/${BUCKETS.VISUALIZATIONS}/${obj.name}`,
+            });
+          }
         }
       }
 
