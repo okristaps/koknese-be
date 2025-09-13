@@ -33,6 +33,7 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin123
       - MINIO_USE_SSL=false
+      - HOST_URL=${HOST_URL:-http://localhost:9000}
     depends_on:
       minio:
         condition: service_healthy

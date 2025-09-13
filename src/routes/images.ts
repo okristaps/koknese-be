@@ -17,24 +17,10 @@ interface GroupedImages {
   4: ImageInfo[];
 }
 
-const buildMinioUrl = (): string => {
-  const frontendMinioUrl = process.env.FRONTEND_MINIO_URL;
-  if (frontendMinioUrl) {
-    return frontendMinioUrl.replace(/\/$/, "");
-  }
-
-  let endpoint = process.env.MINIO_ENDPOINT || "localhost";
-
-  if (endpoint === "minio" && process.env.NODE_ENV === "development") {
-    endpoint = "localhost";
-  }
-
-  const port = process.env.MINIO_PORT || "9000";
-  const protocol = process.env.MINIO_USE_SSL === "true" ? "https" : "http";
-
-  const useStandardPort = (protocol === "https" && port === "443") || (protocol === "http" && port === "80");
-
-  return useStandardPort ? `${protocol}://${endpoint}` : `${protocol}://${endpoint}:${port}`;
+const getImageBaseUrl = (): string => {
+  // Use the host URL from environment (e.g., https://odincash.org)
+  const hostUrl = process.env.HOST_URL || "http://localhost:9000";
+  return hostUrl.replace(/\/$/, ""); // Remove trailing slash
 };
 
 const groupImages = (images: ImageInfo[]): GroupedImages => {
@@ -56,7 +42,7 @@ const groupImages = (images: ImageInfo[]): GroupedImages => {
 };
 
 export const imagesRoutes = async (fastify: FastifyInstance) => {
-  const minioUrl = buildMinioUrl();
+  const imageBaseUrl = getImageBaseUrl();
 
   fastify.get("/debug", async () => {
     try {
@@ -86,7 +72,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
         if (obj.name && obj.name !== prefix) {
           images.push({
             filename: obj.name.replace(prefix, ""),
-            url: `${minioUrl}/${BUCKETS.IMAGES}/${obj.name}`,
+            url: `${imageBaseUrl}/images/${obj.name}`,
           });
         }
       }
