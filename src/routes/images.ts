@@ -1,28 +1,57 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { FastifyInstance } from "fastify";
 import { BUCKETS } from "../config/minio.js";
 
 interface ImageListParams {
   placeId: string;
 }
 
-interface ImageParams {
-  placeId: string;
+interface ImageInfo {
   filename: string;
+  url: string;
 }
 
+interface GroupedImages {
+  1: ImageInfo[];
+  2: ImageInfo[];
+  3: ImageInfo[];
+  4: ImageInfo[];
+}
+
+const buildMinioUrl = (): string => {
+  const endpoint = process.env.MINIO_ENDPOINT === "minio" ? "localhost" : process.env.MINIO_ENDPOINT || "localhost";
+  const port = process.env.MINIO_PORT || "9000";
+  const protocol = process.env.MINIO_USE_SSL === "true" ? "https" : "http";
+  return `${protocol}://${endpoint}:${port}`;
+};
+
+const groupImages = (images: ImageInfo[]): GroupedImages => {
+  const groups: GroupedImages = { 1: [], 2: [], 3: [], 4: [] };
+
+  if (images.length === 0) return groups;
+  if (images.length === 1) return { ...groups, 1: [images[0]] };
+  if (images.length === 2) return { ...groups, 1: [images[0]], 4: [images[1]] };
+
+  groups[1] = [images[0]];
+  groups[4] = [images[images.length - 1]];
+
+  const middle = images.slice(1, -1);
+  const midPoint = Math.ceil(middle.length / 2);
+  groups[2] = middle.slice(0, midPoint);
+  groups[3] = middle.slice(midPoint);
+
+  return groups;
+};
+
 export const imagesRoutes = async (fastify: FastifyInstance) => {
-  // Debug endpoint to see all objects in images bucket
-  fastify.get("/debug", async (request, reply) => {
+  const minioUrl = buildMinioUrl();
+
+  fastify.get("/debug", async () => {
     try {
       const objects: any[] = [];
       const stream = fastify.minio.listObjects(BUCKETS.IMAGES, "", true);
 
       for await (const obj of stream) {
-        objects.push({
-          name: obj.name,
-          size: obj.size,
-          lastModified: obj.lastModified,
-        });
+        objects.push({ name: obj.name, size: obj.size, lastModified: obj.lastModified });
       }
 
       return { bucket: BUCKETS.IMAGES, objects };
@@ -32,72 +61,32 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
-  // Get list of images for a place
-  fastify.get<{ Params: ImageListParams }>("/:placeId", async (request, reply) => {
+  fastify.get<{ Params: ImageListParams }>("/:placeId", async (request) => {
     try {
       const { placeId } = request.params;
-      const objects: any[] = [];
-      const prefix = placeId + "/";
+      const prefix = `${placeId}/`;
+      const images: ImageInfo[] = [];
 
-      fastify.log.info(`Listing objects with prefix: ${prefix}`);
       const stream = fastify.minio.listObjects(BUCKETS.IMAGES, prefix, false);
 
       for await (const obj of stream) {
-        fastify.log.info(`Found object: ${obj.name}`);
         if (obj.name && obj.name !== prefix) {
-          const filename = obj.name.replace(prefix, "");
-          objects.push({
-            filename,
-            url: `/api/images/${placeId}/${filename}`,
+          images.push({
+            filename: obj.name.replace(prefix, ""),
+            url: `${minioUrl}/${BUCKETS.IMAGES}/${obj.name}`,
           });
         }
       }
 
-      fastify.log.info(`Returning ${objects.length} images`);
-      return objects;
+      const grouped = groupImages(images);
+      fastify.log.info(
+        `Grouped ${images.length} images for ${placeId}: [${grouped[1].length}, ${grouped[2].length}, ${grouped[3].length}, ${grouped[4].length}]`
+      );
+
+      return grouped;
     } catch (error: unknown) {
       fastify.log.error(`Error listing images: ${String(error)}`);
-      return [];
+      return { 1: [], 2: [], 3: [], 4: [] } as GroupedImages;
     }
   });
-
-  // Serve individual image
-  fastify.get<{ Params: ImageParams }>(
-    "/:placeId/:filename",
-    async (request: FastifyRequest<{ Params: ImageParams }>, reply: FastifyReply) => {
-      try {
-        const { placeId, filename } = request.params;
-        const objectName = `${placeId}/${filename}`;
-
-        // Get object info first for better error handling and headers
-        const stat = await fastify.minio.statObject(BUCKETS.IMAGES, objectName);
-
-        // Set aggressive caching headers
-        reply.header("Cache-Control", "public, max-age=31536000, immutable"); // 1 year
-        reply.header("ETag", stat.etag);
-        reply.header("Last-Modified", stat.lastModified.toUTCString());
-
-        // Check if client has cached version
-        const ifNoneMatch = request.headers["if-none-match"];
-        if (ifNoneMatch === stat.etag) {
-          return reply.code(304).send();
-        }
-
-        const stream = await fastify.minio.getObject(BUCKETS.IMAGES, objectName);
-
-        // Set content type
-        const contentType = stat.metaData["content-type"] || "image/jpeg";
-        reply.type(contentType);
-        reply.header("Content-Length", stat.size.toString());
-
-        return reply.send(stream);
-      } catch (error: unknown) {
-        if ((error as any).code === "NoSuchKey") {
-          return reply.code(404).send({ error: "Image not found" });
-        }
-        fastify.log.error(`Error serving image: ${String(error)}`);
-        return reply.code(500).send({ error: "Failed to serve image" });
-      }
-    }
-  );
 };
