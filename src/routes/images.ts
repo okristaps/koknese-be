@@ -42,7 +42,6 @@ const groupImages = (images: ImageInfo[]): GroupedImages => {
 };
 
 export const imagesRoutes = async (fastify: FastifyInstance) => {
-  const imageBaseUrl = getImageBaseUrl();
 
   fastify.get("/debug", async () => {
     try {
@@ -72,7 +71,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
         if (obj.name && obj.name !== prefix) {
           images.push({
             filename: obj.name.replace(prefix, ""),
-            url: `${imageBaseUrl}/images/${obj.name}`,
+            url: `${getImageBaseUrl()}/${BUCKETS.IMAGES}/${obj.name}`,
           });
         }
       }
