@@ -18,10 +18,23 @@ interface GroupedImages {
 }
 
 const buildMinioUrl = (): string => {
-  const endpoint = process.env.MINIO_ENDPOINT === "minio" ? "localhost" : process.env.MINIO_ENDPOINT || "localhost";
+  const frontendMinioUrl = process.env.FRONTEND_MINIO_URL;
+  if (frontendMinioUrl) {
+    return frontendMinioUrl.replace(/\/$/, "");
+  }
+
+  let endpoint = process.env.MINIO_ENDPOINT || "localhost";
+
+  if (endpoint === "minio" && process.env.NODE_ENV === "development") {
+    endpoint = "localhost";
+  }
+
   const port = process.env.MINIO_PORT || "9000";
   const protocol = process.env.MINIO_USE_SSL === "true" ? "https" : "http";
-  return `${protocol}://${endpoint}:${port}`;
+
+  const useStandardPort = (protocol === "https" && port === "443") || (protocol === "http" && port === "80");
+
+  return useStandardPort ? `${protocol}://${endpoint}` : `${protocol}://${endpoint}:${port}`;
 };
 
 const groupImages = (images: ImageInfo[]): GroupedImages => {
