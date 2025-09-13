@@ -17,10 +17,21 @@ interface GroupedImages {
   4: ImageInfo[];
 }
 
-const getImageBaseUrl = (): string => {
-  // Use the host URL from environment (e.g., https://odincash.org)
-  const hostUrl = process.env.HOST_URL || "http://localhost:9000";
-  return hostUrl.replace(/\/$/, ""); // Remove trailing slash
+const getMinioPublicUrl = (): string => {
+  // Use MINIO_PUBLIC_URL if set, otherwise fall back to HOST_URL + /minio or localhost
+  const publicUrl = process.env.MINIO_PUBLIC_URL;
+  if (publicUrl) {
+    return publicUrl.replace(/\/$/, ''); // Remove trailing slash
+  }
+  
+  // Fall back to HOST_URL + /minio pattern
+  const hostUrl = process.env.HOST_URL;
+  if (hostUrl && !hostUrl.includes('localhost')) {
+    return `${hostUrl.replace(/\/$/, '')}/minio`;
+  }
+  
+  // Development fallback
+  return 'http://localhost:9000';
 };
 
 const groupImages = (images: ImageInfo[]): GroupedImages => {
@@ -71,7 +82,7 @@ export const imagesRoutes = async (fastify: FastifyInstance) => {
         if (obj.name && obj.name !== prefix) {
           images.push({
             filename: obj.name.replace(prefix, ""),
-            url: `${getImageBaseUrl()}/${BUCKETS.IMAGES}/${obj.name}`,
+            url: `${getMinioPublicUrl()}/${BUCKETS.IMAGES}/${obj.name}`,
           });
         }
       }
